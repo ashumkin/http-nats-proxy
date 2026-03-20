@@ -7,6 +7,11 @@ const ids = new SharedArray('ids', function () {
     if (__ENV.IDS_FILE) {
         console.log("Reading", __ENV.IDS_FILE);
         let r = open(__ENV.IDS_FILE).split('\n');
+        if (r.length > 1) {
+            if (r[r.length - 1] === '') {
+                r.pop()
+            }
+        }
         console.log("Done reading");
 
         return r;
