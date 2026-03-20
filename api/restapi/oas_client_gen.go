@@ -139,6 +139,23 @@ func (c *Client) sendV1RequestReplyPost(ctx context.Context, request *V1RequestR
 			return res, errors.Wrap(err, "encode query")
 		}
 	}
+	{
+		// Encode "ReplyTimeout" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "ReplyTimeout",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.ReplyTimeout.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
 	u.RawQuery = q.Values().Encode()
 
 	stage = "EncodeRequest"
@@ -159,20 +176,6 @@ func (c *Client) sendV1RequestReplyPost(ctx context.Context, request *V1RequestR
 		}
 		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.XRequestID.Get(); ok {
-				return e.EncodeValue(conv.StringToString(val))
-			}
-			return nil
-		}); err != nil {
-			return res, errors.Wrap(err, "encode header")
-		}
-	}
-	{
-		cfg := uri.HeaderParameterEncodingConfig{
-			Name:    "Nats-Reply-Timeout",
-			Explode: false,
-		}
-		if err := h.EncodeParam(cfg, func(e uri.Encoder) error {
-			if val, ok := params.NatsReplyTimeout.Get(); ok {
 				return e.EncodeValue(conv.StringToString(val))
 			}
 			return nil

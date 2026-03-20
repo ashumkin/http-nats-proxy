@@ -13,16 +13,35 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-const defaultTimeout = "5s"
+const defaultTimeout = time.Second * 5
 
 // Server is a server.
 type Server struct {
-	nc *nats.Conn
+	nc             *nats.Conn
+	defaultTimeout time.Duration
 }
 
+// ServerOpt is the functional option.
+type ServerOpt func(*Server)
+
 // NewServer returns Server.
-func NewServer(nc *nats.Conn) *Server {
-	return &Server{nc: nc}
+func NewServer(nc *nats.Conn, opts ...ServerOpt) *Server {
+	s := Server{
+		nc:             nc,
+		defaultTimeout: defaultTimeout,
+	}
+	for _, opt := range opts {
+		opt(&s)
+	}
+
+	return &s
+}
+
+// WithDefaultTimeout sets default timeout.
+func WithDefaultTimeout(d time.Duration) ServerOpt {
+	return func(s *Server) {
+		s.defaultTimeout = d
+	}
 }
 
 // V1RequestReplyPost implements interface.
@@ -32,14 +51,17 @@ func (s Server) V1RequestReplyPost(
 	req *restapi.V1RequestReplyPostReqWithContentType,
 	params restapi.V1RequestReplyPostParams,
 ) (restapi.V1RequestReplyPostRes, error) {
-	timeout := params.NatsReplyTimeout.Value
+	var timeoutDuration time.Duration
+	var err error
+	timeout := params.ReplyTimeout.Value
 	if timeout == "" {
-		timeout = defaultTimeout
-	}
-	timeoutDuration, err := time.ParseDuration(timeout)
-	if err != nil {
-		// nolint:nilerr
-		return &restapi.V1RequestReplyPostBadRequest{}, nil
+		timeoutDuration = s.defaultTimeout
+	} else {
+		timeoutDuration, err = time.ParseDuration(timeout)
+		if err != nil {
+			// nolint:nilerr
+			return &restapi.V1RequestReplyPostBadRequest{}, nil
+		}
 	}
 	msg := nats.NewMsg(params.Subject)
 	log := slog.With("subject", msg.Subject, "request_id", params.XRequestID.Value)

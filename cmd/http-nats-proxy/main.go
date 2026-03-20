@@ -27,11 +27,14 @@ func runmain() int {
 	var addr string
 	var natsURL string
 	var logLevel string
+	var defaultTimeout time.Duration
 
 	app := fisk.New("http-nats-proxy", "http-nats-proxy")
 	app.Flag("addr", "Listen address").Default(":8080").StringVar(&addr)
 	app.Flag("nats-url", "NATS server URL").Default("nats://localhost:4222").StringVar(&natsURL)
 	app.Flag("log-level", "Log level").Default("info").StringVar(&logLevel)
+	app.Flag("default-timeout", "Default timeout for waiting NATS responses").Default("5s").
+		DurationVar(&defaultTimeout)
 
 	_, err := app.Parse(os.Args[1:])
 	if err != nil {
@@ -57,7 +60,7 @@ func runmain() int {
 
 		return 1
 	}
-	srv := api.NewServer(ncConn)
+	srv := api.NewServer(ncConn, api.WithDefaultTimeout(defaultTimeout))
 
 	var opts []restapi.ServerOption
 	server, err := restapi.NewServer(srv, opts...)

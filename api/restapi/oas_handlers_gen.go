@@ -154,9 +154,9 @@ func (s *Server) handleV1RequestReplyPostRequest(args [0]string, argsEscaped boo
 					In:   "query",
 				}: params.Subject,
 				{
-					Name: "Nats-Reply-Timeout",
-					In:   "header",
-				}: params.NatsReplyTimeout,
+					Name: "ReplyTimeout",
+					In:   "query",
+				}: params.ReplyTimeout,
 			},
 			Raw: r,
 		}

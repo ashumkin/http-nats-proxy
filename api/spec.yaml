@@ -65,13 +65,12 @@ components:
         description: Subject to request
       example: "test.subject"
     Timeout:
-      name: Nats-Reply-Timeout
-      in: header
+      name: ReplyTimeout
+      in: query
       required: false
       schema:
         type: string
-        default: "5s"
-      description: Timeout to wait reply (in Go duration)
+      description: Timeout to wait reply (in Go duration). Default is the the server's default specified on its start.
       example: "10s"
   schemas:
     Error:

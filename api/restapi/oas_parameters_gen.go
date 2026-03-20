@@ -16,8 +16,8 @@ type V1RequestReplyPostParams struct {
 	// The ID of the request.
 	XRequestID OptString `json:",omitempty,omitzero"`
 	Subject    string
-	// Timeout to wait reply (in Go duration).
-	NatsReplyTimeout OptString `json:",omitempty,omitzero"`
+	// Timeout to wait reply (in Go duration). Default is the the server's default specified on its start.
+	ReplyTimeout OptString `json:",omitempty,omitzero"`
 }
 
 func unpackV1RequestReplyPostParams(packed middleware.Parameters) (params V1RequestReplyPostParams) {
@@ -39,11 +39,11 @@ func unpackV1RequestReplyPostParams(packed middleware.Parameters) (params V1Requ
 	}
 	{
 		key := middleware.ParameterKey{
-			Name: "Nats-Reply-Timeout",
-			In:   "header",
+			Name: "ReplyTimeout",
+			In:   "query",
 		}
 		if v, ok := packed[key]; ok {
-			params.NatsReplyTimeout = v.(OptString)
+			params.ReplyTimeout = v.(OptString)
 		}
 	}
 	return params
@@ -127,20 +127,17 @@ func decodeV1RequestReplyPostParams(args [0]string, argsEscaped bool, r *http.Re
 			Err:  err,
 		}
 	}
-	// Set default value for header: Nats-Reply-Timeout.
-	{
-		val := string("5s")
-		params.NatsReplyTimeout.SetTo(val)
-	}
-	// Decode header: Nats-Reply-Timeout.
+	// Decode query: ReplyTimeout.
 	if err := func() error {
-		cfg := uri.HeaderParameterDecodingConfig{
-			Name:    "Nats-Reply-Timeout",
-			Explode: false,
+		cfg := uri.QueryParameterDecodingConfig{
+			Name:    "ReplyTimeout",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
 		}
-		if err := h.HasParam(cfg); err == nil {
-			if err := h.DecodeParam(cfg, func(d uri.Decoder) error {
-				var paramsDotNatsReplyTimeoutVal string
+
+		if err := q.HasParam(cfg); err == nil {
+			if err := q.DecodeParam(cfg, func(d uri.Decoder) error {
+				var paramsDotReplyTimeoutVal string
 				if err := func() error {
 					val, err := d.DecodeValue()
 					if err != nil {
@@ -152,12 +149,12 @@ func decodeV1RequestReplyPostParams(args [0]string, argsEscaped bool, r *http.Re
 						return err
 					}
 
-					paramsDotNatsReplyTimeoutVal = c
+					paramsDotReplyTimeoutVal = c
 					return nil
 				}(); err != nil {
 					return err
 				}
-				params.NatsReplyTimeout.SetTo(paramsDotNatsReplyTimeoutVal)
+				params.ReplyTimeout.SetTo(paramsDotReplyTimeoutVal)
 				return nil
 			}); err != nil {
 				return err
@@ -166,8 +163,8 @@ func decodeV1RequestReplyPostParams(args [0]string, argsEscaped bool, r *http.Re
 		return nil
 	}(); err != nil {
 		return params, &ogenerrors.DecodeParamError{
-			Name: "Nats-Reply-Timeout",
-			In:   "header",
+			Name: "ReplyTimeout",
+			In:   "query",
 			Err:  err,
 		}
 	}

@@ -12,7 +12,7 @@ import (
 
 var (
 	rn1AllowedHeaders = map[string]string{
-		"POST": "Content-Type,Nats-Reply-Timeout,X-Request-Id",
+		"POST": "Content-Type,X-Request-Id",
 	}
 )
 
