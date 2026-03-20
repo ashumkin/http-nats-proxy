@@ -1,0 +1,88 @@
+openapi: 3.0.0
+info:
+  title: HTTP proxy to NATS
+  description: ''
+  # version has special indentation
+  # do not change it unless you know what you are doing
+  version: "{{ .Version }}"
+paths:
+  /v1/request-reply:
+    post:
+      description: Use request-reply
+      parameters:
+        - $ref: '#/components/parameters/RequestID'
+        - $ref: '#/components/parameters/Subject'
+        - $ref: '#/components/parameters/Timeout'
+      requestBody:
+        required: true
+        content:
+          '*/*':
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Success
+          headers:
+            Rtt:
+              required: true
+              schema:
+                type: string
+          content:
+            '*/*':
+              schema:
+                description: NATS response
+                type: string
+                format: binary
+        '400':
+          description: Bad request
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                '1':
+                  summary: Generic Error
+                  value: { "message": "An unexpected error occurred" }
+components:
+  parameters:
+    RequestID:
+      name: X-Request-Id
+      in: header
+      required: false
+      schema:
+        type: string
+      description: The ID of the request.
+      example: "request-id-1234"
+    Subject:
+      name: subject
+      in: query
+      required: true
+      schema:
+        type: string
+        description: Subject to request
+      example: "test.subject"
+    Timeout:
+      name: Nats-Reply-Timeout
+      in: header
+      required: false
+      schema:
+        type: string
+        default: "5s"
+      description: Timeout to wait reply (in Go duration)
+      example: "10s"
+  schemas:
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Error description
+        title:
+          type: string
+        code:
+          type: string
+      required:
+        - message

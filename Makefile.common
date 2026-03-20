@@ -1,0 +1,175 @@
+unexport GOBIN
+
+SHELL        := /bin/bash
+GO           ?= go
+GOFMT        ?= $(GO)fmt
+GOOPTS       ?=
+GOTESTOPTS   ?=
+GOTESTTIMEOUT ?= 3m
+GOTESTARGS   ?=
+GOTESTVERBOSE ?=
+GOMODOPTS    ?=
+GOHOSTOS     ?= $(shell $(GO) env GOHOSTOS)
+GOHOSTARCH   ?= $(shell $(GO) env GOHOSTARCH)
+
+OGEN_VERSION_TAG := v1.20.1
+BUILD_APP_DIR ?= cmd/http-nats-proxy
+BUILD_OUT_BINARY ?= ../../bin/http-nats-proxy
+
+pkgs          = ./...
+
+GOTEST := $(GO) test $(GOTESTVERBOSE) -timeout $(GOTESTTIMEOUT)
+GOTEST_DIR :=
+
+SKIP_GOLANGCI_LINT :=
+GOLANGCI_LINT_OPTS ?=
+GOLANGCI_LINT_VERSION ?= v2.11.3
+# golangci-lint only supports linux, darwin and windows platforms on i386/amd64/arm64.
+# windows isn't included here because of the path separator being different.
+ifeq ($(GOHOSTOS),$(filter $(GOHOSTOS),linux darwin))
+	ifeq ($(GOHOSTARCH),$(filter $(GOHOSTARCH),amd64 i386 arm64))
+		ifneq (,$(SKIP_GOLANGCI_LINT))
+			GOLANGCI_LINT :=
+		else
+			GOLANGCI_LINT ?= ./bin/golangci-lint
+		endif
+	endif
+endif
+
+PREFIX                  ?= $(shell pwd)
+BIN_DIR                 ?= $(shell pwd)
+
+ifeq ($(GOHOSTARCH),$(filter $(GOHOSTARCH),amd64 arm64))
+        ifeq ($(GOHOSTOS),$(filter $(GOHOSTOS),linux freebsd darwin windows))
+                # Only supported on amd64/arm64
+                test-flags := -race -tags debugger
+        endif
+endif
+
+# This rule is used to forward a target like "build" to "common-build".  This
+# allows a new "build" target to be defined in a Makefile which includes this
+# one and override "common-build" without override warnings.
+%: common-% ;
+
+.PHONY: common-all
+common-all: style lint unused
+
+.PHONY: common-style
+common-style:
+	@echo ">> checking code style"
+	@fmtRes=$$($(GOFMT) -d $$(find . -path ./vendor -prune -o -name '*.go' -print)); \
+	if [ -n "$${fmtRes}" ]; then \
+		echo "gofmt checking failed!"; echo "$${fmtRes}"; echo; \
+		echo "Please ensure you are using $$($(GO) version) for formatting code."; \
+		exit 1; \
+	fi
+
+.PHONY: common-deps
+common-deps:
+	@echo ">> getting dependencies"
+	$(GO) mod download $(GOMODOPTS)
+
+.PHONY: update-go-deps
+update-go-deps:
+	@echo ">> updating Go dependencies"
+	@for m in $$($(GO) list -mod=readonly -m -f '{{ if and (not .Indirect) (not .Main)}}{{.Path}}{{end}}' all); do \
+		$(GO) get $$m; \
+	done
+	$(GO) mod tidy
+
+.PHONY: common-test-short
+common-test-short: $(GOTEST_DIR)
+	@echo ">> running short tests"
+	$(GOTEST) -short $(test-flags) $(GOTESTOPTS) -tags no_integration_tests $(pkgs) $(GOTESTARGS)
+
+.PHONY: common-test-unit
+common-test-unit: $(GOTEST_DIR)
+	@echo ">> running all tests"
+	$(GOTEST) $(test-flags) $(GOTESTOPTS) -tags no_integration_tests $(pkgs) $(GOTESTARGS)
+
+.PHONY: common-test-run
+common-test-run: $(GOTEST_DIR)
+	@echo ">> running all tests"
+	$(GOTEST) $(test-flags) $(GOOPTS) $(GOTESTOPTS) $(pkgs) $(GOTESTARGS)
+
+.PHONY: common-test
+common-test: common-test-run
+
+$(GOTEST_DIR):
+	@mkdir -p $@
+
+.PHONY: common-format
+common-format:
+	@echo ">> formatting code"
+	$(GO) fmt $(pkgs)
+
+.PHONY: common-vet
+common-vet:
+	@echo ">> vetting code"
+	$(GO) vet $(GOOPTS) $(pkgs)
+
+.PHONY: common-lint
+common-lint: $(GOLANGCI_LINT)
+ifdef GOLANGCI_LINT
+	@echo ">> running golangci-lint"
+# 'go list' needs to be executed before staticcheck to prepopulate the modules cache.
+# Otherwise staticcheck might fail randomly for some reason not yet explained.
+	$(GO) list -e -compiled -test=true -export=false -deps=true -find=false -tags= -- ./... > /dev/null
+	$(GOLANGCI_LINT) run $(GOLANGCI_LINT_OPTS) $(pkgs)
+endif
+
+.PHONY: common-lint-fix
+common-lint-fix: $(GOLANGCI_LINT)
+ifdef GOLANGCI_LINT
+	@echo ">> running golangci-lint fix"
+	$(GOLANGCI_LINT) run --fix $(GOLANGCI_LINT_OPTS) $(pkgs)
+endif
+
+.PHONY: common-clean-linter
+common-clean-linter:
+	$(GOLANGCI_LINT) cache clean
+
+.PHONY: common-unused
+common-unused:
+	@echo ">> running check for unused/missing packages in go.mod"
+	$(GO) mod tidy
+	@git diff --exit-code -- go.sum go.mod
+
+ifdef GOLANGCI_LINT
+$(GOLANGCI_LINT):
+	$(eval linter_dir := $(shell dirname $(GOLANGCI_LINT)))
+	mkdir -p $(linter_dir)
+	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_LINT_VERSION)/install.sh \
+		| sed -e '/install -d/d' \
+		| sh -s -- -b $(linter_dir) $(GOLANGCI_LINT_VERSION)
+endif
+
+.PHONY: common-generate
+common-generate:
+	$(GO) generate $(pkgs)
+
+.PHONY: common-build
+common-build:
+	@echo ">> building binary"
+	cd $(BUILD_APP_DIR) && $(GO) build \
+		--ldflags "\
+		-X github.com/prometheus/common/version.Version=${GIT_VERSION} \
+		-X github.com/prometheus/common/version.Revision=${GIT_REVISION} \
+		-X github.com/prometheus/common/version.Branch=${GIT_BRANCH} \
+		-X github.com/prometheus/common/version.BuildDate=$$(date -u +%Y%m%d-%H:%M:%S)" \
+		-o $(BUILD_OUT_BINARY)
+
+.PHONY: common-clean
+common-clean: common-clean-linter
+
+.PHONY: common-openapi
+common-openapi: common-openapi-gen
+
+.PHONY: common-openapi-gen
+common-openapi-gen:
+	go run github.com/ogen-go/ogen/cmd/ogen@$(OGEN_VERSION_TAG) --config api/ogen/config.yaml --target api/restapi --package restapi --clean api/spec.yaml
+	@echo
+	@echo Do not forget to call
+	@echo   git add api/restapi
+	@echo
+

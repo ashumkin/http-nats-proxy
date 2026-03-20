@@ -1,0 +1,34 @@
+version: 2
+linters:
+  disable-all: true
+  enable:
+    - bodyclose
+    - errcheck
+    - errchkjson
+    - funlen
+    - gochecknoglobals
+    - goconst
+    - gocritic
+    - godot
+    - mnd
+    - gosec
+    - gosmopolitan
+    - govet
+    - ireturn
+    - lll
+    - nakedret
+    - nilerr
+    - nlreturn
+    - noctx
+    - perfsprint
+    - prealloc
+    - promlinter
+    - revive
+    - rowserrcheck
+    - sloglint
+    - sqlclosecheck
+    - staticcheck
+    - testifylint
+    - unused
+    - unconvert
+    - whitespace
