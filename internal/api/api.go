@@ -42,7 +42,7 @@ func (s Server) V1RequestReplyPost(
 		return &restapi.V1RequestReplyPostBadRequest{}, nil
 	}
 	msg := nats.NewMsg(params.Subject)
-	log := slog.With("subject", msg.Subject, "request_id", params.XRequestID)
+	log := slog.With("subject", msg.Subject, "request_id", params.XRequestID.Value)
 
 	msg.Data, err = io.ReadAll(req.Content.Data)
 	if err != nil {
