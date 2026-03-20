@@ -2,6 +2,7 @@ import {check} from 'k6';
 import {SharedArray} from 'k6/data';
 import {scenario} from 'k6/execution';
 import http from 'k6/http';
+import { uuidv4 } from './k6-utils-1.4.0.js';
 
 const ids = new SharedArray('ids', function () {
     if (__ENV.IDS_FILE) {
@@ -50,6 +51,7 @@ function request_reply(subject, payload) {
     const headers = {
         headers: {
             'Content-Type': 'octet/stream',
+            'X-Request-Id': uuidv4(),
         }
     }
 
